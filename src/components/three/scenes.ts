@@ -57,4 +57,18 @@ export const scenes: Record<string, SceneEntry> = {
     tags: ['hybrid-systems', 'runtime'],
     load: () => import('./TrafficLightScene'),
   },
+  'risk-envelope': {
+    title: 'Risk Envelope',
+    description:
+      'A live port of riskenv: CPA metrics, the three indices of interest and the convex-hull Risk Envelope, recomputed every frame. Steer the agent with your pointer; click to change the time of interest.',
+    tags: ['collision-avoidance', 'motion-planning'],
+    load: () => import('./RiskEnvelopeScene'),
+  },
+  'cpa-geometry': {
+    title: 'Closest Point of Approach',
+    description:
+      "How riskenv's calc_cpa sees two vessels: replayed straight-line tracks, DCPA at TCPA, and the special cases. Pointer sets the obstacle's heading and speed.",
+    tags: ['collision-avoidance', 'geometry'],
+    load: () => import('./CpaScene'),
+  },
 };

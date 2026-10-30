@@ -148,3 +148,22 @@ export function makeLabel(width: number, height: number, scale: number) {
   };
   return { sprite, texture, draw };
 }
+
+/** Low-poly boat hull pointing along +x, sized to its safety radius. */
+export function makeBoat(length: number, color: number) {
+  const shape = new THREE.Shape();
+  shape.moveTo(length / 2, 0);
+  shape.lineTo(length * 0.15, length * 0.2);
+  shape.lineTo(-length / 2, length * 0.17);
+  shape.lineTo(-length / 2, -length * 0.17);
+  shape.lineTo(length * 0.15, -length * 0.2);
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: length * 0.12, bevelEnabled: false });
+  geo.rotateX(-Math.PI / 2); // extrude upward, shape in the x/z plane
+  const mesh = new THREE.Mesh(
+    geo,
+    new THREE.MeshStandardMaterial({ color: COLORS.steel, metalness: 0.6, roughness: 0.4, emissive: color, emissiveIntensity: 0.15 }),
+  );
+  addEdges(mesh, color);
+  return mesh;
+}

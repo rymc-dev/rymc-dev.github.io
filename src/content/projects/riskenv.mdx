@@ -1,0 +1,91 @@
+---
+title: 'riskenv: Real-Time Risk Envelopes'
+summary: 'A Python library that turns moving obstacles into a single convex "Risk Envelope" for collision-aware motion planning, using closest-point-of-approach geometry and three indices of interest.'
+date: 2026-08-09
+tags: ['python', 'collision-avoidance', 'motion-planning', 'marine-robotics']
+repo: 'https://github.com/rymc-dev/riskenv'
+scene: 'risk-envelope'
+featured: true
+---
+
+import SceneCanvas from '../../components/three/SceneCanvas.astro';
+
+## Overview
+
+An autonomous vessel crossing a busy waterway doesn't need to know about every other vessel. It needs to know **which ones matter right now, and where they will be when they matter**. `riskenv` answers that with a single geometric object, the **Risk Envelope**: a convex polygon bounding every region the agent should currently treat as a collision risk. A downstream planner can then route around it, for example by placing a virtual waypoint just outside the hull.
+
+It implements the method from _"Geometric Motion Planning in Dynamic Environments"_ (R. McKee, N. Athanasopoulos, W. Naeem). v1.0.0 was released on PyPI in August 2026 alongside the conference paper:
+
+```console
+pip install riskenv
+```
+
+```python
+import math
+from riskenv import create_unsafe_set, Agent, Obstacle
+
+agent = Agent(position=(10.0, 10.0), heading=0.0, speed=15.0, yaw_rate=0.2, safety_radius=5.0)
+obstacles = [Obstacle(position=(30.0, 20.0), heading=math.pi, speed=20.0, yaw_rate=0.1, safety_radius=10.0)]
+
+vertices = create_unsafe_set(agent=agent, obstacles=obstacles, dsf=10.0)  # [[x, y], ...] or []
+```
+
+## The demo above
+
+The scene runs a function-for-function TypeScript port of `create_unsafe_set` every frame:
+
+- **Your pointer steers the agent** (cyan). When you leave it alone, the agent loops around the arena on its own.
+- The faint cyan ring is the agent's **I1 reach**: safety radius + `dsf`.
+- Obstacles turn **yellow** when they're in I1 and **magenta** when they're in I3. Yellow links join obstacles that are in I2.
+- For each obstacle in the union, a dashed line runs to its **predicted position at TCPA**, and that predicted circle joins the hull.
+- The **magenta polygon is the Risk Envelope**.
+- **Click to cycle `time_of_interest`** (5 / 15 / 30 s) and watch I3, and with it the envelope, reach further ahead.
+
+The readout shows the size of each set and the live cost of the call in your browser. The obstacles bounce off the arena walls, which the constant-yaw-rate prediction can't know about. Watch the ghosts jump when they do: it's the model's main assumption made visible.
+
+## The method
+
+### 1. Closest point of approach
+
+<SceneCanvas scene="cpa-geometry" height="420px" />
+
+Everything starts from **CPA** geometry between the agent and each obstacle, assuming both hold their current velocity. With relative position `p_rel = p_agent − p_obs` and relative velocity `v_rel = v_agent − v_obs`:
+
+- **TCPA** = `−(p_rel · v_rel) / ‖v_rel‖²`: _when_ they'll be closest
+- **DCPA** = `‖p_rel + TCPA · v_rel‖`: _how close_ they'll get
+
+`calc_cpa` handles the degenerate cases explicitly rather than letting them leak NaNs into the planner. If the CPA is in the past (TCPA ≤ 0, i.e. the two are diverging), it returns `(NaN, NaN)`, meaning no future risk. If the relative velocity is near zero (‖v_rel‖² < 1e-6), the separation never changes, so DCPA is just the current distance. **In the demo above, move horizontally to change the obstacle's heading and vertically to change its speed.** The ghost boats replay both tracks up to TCPA, and the yellow segment is DCPA. Both are snapped to steps, so you can line the obstacle up at 0° and 5 m/s and land exactly in the parallel case.
+
+### 2. Three indices of interest
+
+Each obstacle is then tested against three filters, all sharing one threshold, the **distance safety factor** `dsf`. Distances are measured net of both safety radii.
+
+| Index | Membership | Captures |
+|---|---|---|
+| **I1** | distance(agent, obstacle) ≤ dsf | obstacles that are already close |
+| **I2** | in I1 _and_ another obstacle within dsf of it | close obstacles in a cluster, which constrain escape routes |
+| **I3** | DCPA ≤ dsf _and_ TCPA ≤ `time_of_interest` | obstacles that aren't close yet but will be soon |
+
+The union `I1 ∪ I2 ∪ I3` is the set of obstacles that matter. I2 is a subset of I1 by definition, so it labels clustered obstacles rather than adding new ones. I3 is the predictive one: it catches a fast crossing vessel while it's still far away.
+
+### 3. Convex hull
+
+For every obstacle in the union, the safety circle is approximated by 10 vertices at its **current** position. If it has a future CPA, a second circle goes at its **predicted** position at TCPA, using a constant-yaw-rate dead-reckoning model (`predict_position`). The convex hull of all those vertices is the Risk Envelope. A 10-gon under-approximates a circle by at most `r(1 − cos(π/10))`, under 0.5 m for the 5–10 m safety radii typical of the target vessels.
+
+A convex polygon is a deliberately simple output. Planners can check it against a candidate path with a handful of half-plane tests, it's cheap to recompute every control cycle, and it stays one object however many obstacles feed it.
+
+## Engineering
+
+- **Small, composable API:** `create_unsafe_set` is a thin orchestrator. Every stage (`calc_cpa`, `calculate_obstacle_metrics_for_agent`, `calc_I1/I2/I3`, `unionise_indices_of_interest`, `gen_uIoI_convhull`, `predict_position`) is importable on its own, so a planner can reuse just the CPA metrics or swap in its own hull. `heading_from_quaternion` covers ROS-style orientations.
+- **Domain-agnostic:** agents and obstacles are plain dataclasses (position, heading, speed, yaw rate, safety radius), so the same code works for vessels, ground robots or UAVs. Positions can be 2-D or 3-D; the computation is planar.
+- **Tested two ways:** there are unit tests for every module, plus 19 YAML integration scenarios (static obstacles, moving grids, narrow passages, intersection conflicts, dense fields, time-varying sets). Each scenario renders to an animated GIF, so the envelope's behaviour can be reviewed visually, not just numerically.
+- **CI/CD:** GitHub Actions runs the unit tests on Python 3.10–3.12, and published releases go to PyPI via trusted publishing.
+- **C++ port:** [`riskenv-cpp`](https://github.com/rymc-dev/riskenv-cpp) implements the same unsafe-set method in C++.
+
+## Limitations
+
+The method is honest about what it assumes:
+
+- **Constant velocity and yaw rate.** CPA uses straight-line velocities, and the predicted circle uses constant yaw rate. Manoeuvring obstacles, like the wall bounces in the demo, invalidate the prediction until the next update.
+- **Perfect information.** Obstacle states are taken as exact. Uncertainty-aware (probabilistic) envelopes are future work.
+- **Planar hull.** 3-D positions are accepted, but the envelope is a 2-D polygon. A full 3-D hull for UAVs is on the roadmap.
