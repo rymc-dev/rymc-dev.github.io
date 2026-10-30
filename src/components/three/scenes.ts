@@ -29,4 +29,18 @@ export const scenes: Record<string, SceneEntry> = {
     tags: ['perception', 'sensors'],
     load: () => import('./LidarScene'),
   },
+  'bouncing-ball-automaton': {
+    title: 'Hybrid Automaton: Bouncing Ball',
+    description:
+      'The classic hybrid system, run by a port of the hybrid-automaton runtime. Guards, resets and priorities drive the mode graph live. Move to change restitution, click to drop.',
+    tags: ['hybrid-systems', 'control'],
+    load: () => import('./BouncingBallScene'),
+  },
+  'cruise-control-automaton': {
+    title: 'Hybrid Automaton: Cruise Control',
+    description:
+      'Four modes, nine prioritised transitions and a (gap, speed) phase portrait. Move across the scene to set the lead car\'s speed and push it into emergency braking.',
+    tags: ['hybrid-systems', 'control'],
+    load: () => import('./CruiseControlScene'),
+  },
 };

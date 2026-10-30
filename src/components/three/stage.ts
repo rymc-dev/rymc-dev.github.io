@@ -113,3 +113,32 @@ export function addFloor(scene: THREE.Scene, size = 20): void {
   mat.opacity = 0.18;
   scene.add(grid);
 }
+
+/** Text on a canvas texture, drawn as a camera-facing sprite. */
+export function makeLabel(width: number, height: number, scale: number) {
+  const c = document.createElement('canvas');
+  c.width = width;
+  c.height = height;
+  const ctx = c.getContext('2d')!;
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, fog: false }),
+  );
+  sprite.scale.set((width / height) * scale, scale, 1);
+  let last = '';
+  const draw = (lines: string[], color: number, size = 34) => {
+    const key = lines.join('\n') + color;
+    if (key === last) return;
+    last = key;
+    ctx.clearRect(0, 0, width, height);
+    ctx.font = `${size}px 'JetBrains Mono', ui-monospace, monospace`;
+    ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const lh = size * 1.25;
+    lines.forEach((l, i) => ctx.fillText(l, width / 2, height / 2 + (i - (lines.length - 1) / 2) * lh));
+    texture.needsUpdate = true;
+  };
+  return { sprite, texture, draw };
+}

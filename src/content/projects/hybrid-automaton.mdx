@@ -1,0 +1,124 @@
+---
+title: 'hybrid-automaton: Hybrid Systems in Python'
+summary: 'An asyncio-native Python framework for defining, simulating and running hybrid automata in real time, built to drop into ROS 2 and other robotics stacks.'
+date: 2026-08-10
+tags: ['python', 'hybrid-systems', 'asyncio', 'ros2']
+repo: 'https://github.com/rymc-dev/hybrid-automaton'
+scene: 'bouncing-ball-automaton'
+featured: true
+---
+
+import SceneCanvas from '../../components/three/SceneCanvas.astro';
+
+## Overview
+
+Many robotic systems are **hybrid**. Continuous physics (position, velocity, temperature) evolves inside a set of discrete **modes** (cruising, braking, docking), and the system jumps between modes when a condition is met. A _hybrid automaton_ models this formally:
+
+- **Modes** (discrete states), each with its own **flow**: the continuous dynamics `ẋ = f(x)` that apply while you're in that mode
+- **Guards**: conditions on the state that enable a transition between modes
+- **Resets**: instantaneous jumps applied to the continuous state when a transition fires
+- **Invariants**: conditions that must hold while you stay in a mode
+
+I needed this for a hybrid-automaton USV (uncrewed surface vessel) project. I wanted to define an automaton once, simulate it offline and then run it live against a real system, all from one lightweight Python library, so I built one. `hybrid-automaton` reached **v1.0.0** in August 2026 with a stable API and is published on PyPI:
+
+```console
+pip install hybrid-automaton
+```
+
+## The demo above
+
+The scene is the package's bouncing-ball example (`hybrid_automatons/bouncing_ball.py`), ported step for step to TypeScript so it runs in your browser:
+
+- The ball **FLYs** under gravity: `ẏ = v`, `v̇ = g`.
+- When `y ≤ 0 ∧ v < 0`, the `hit_ground` guard fires. Its **reset** flips the velocity and scales it by the restitution `e`: `v⁺ = −e·v⁻`.
+- In **GROUND**, two transitions compete. `come_to_rest` (priority 1) wins if the ball has lost its bounce (`|v| ≤ 0.1`); otherwise `bounce_up` (priority 2) launches it again.
+- **RESTING** is a _final_ state. The real run terminates there; the demo drops the ball again.
+
+Each fired edge flashes yellow on the mode graph. The trace on the back wall is `y(t)`, coloured by mode. It's the same plot `continuous_states_over_time_fig` produces, with the shrinking parabolas and the discontinuities where resets fire. **Move across the scene to change the restitution, and click to drop the ball from a new height.**
+
+Here's the actual definition in the framework:
+
+```python
+@continuous_dynamics
+def flying_flow(ctx: RuntimeContext) -> np.ndarray:
+    y, v = ctx.continuous_state.latest()
+    return np.array([v, ctx.configuration['gravity']])
+
+@guard
+def hits_ground(ctx: RuntimeContext) -> bool:
+    y, v = ctx.continuous_state.latest()
+    return y <= 0.0 and v < 0
+
+@reset
+def bounce_reset(ctx: RuntimeContext) -> RuntimeContext:
+    y, v = ctx.continuous_state.latest()
+    ctx.continuous_state.set_continuous_state(np.array([0.0, -v * ctx.configuration['restitution']]))
+    return ctx
+
+flying = State(name="FLYING", initial=True, flow=flying_flow)
+ground = State(name="GROUND", flow=ground_flow)
+resting = State(name="RESTING", flow=resting_flow, final=True, invariants=[failing_invariant])
+
+flying.add_transition(Transition("hit_ground", ground, guards=[hits_ground], reset=bounce_reset, priority=1))
+ground.add_transition(Transition("bounce_up", flying, guards=[bounce_possible], priority=2))
+ground.add_transition(Transition("come_to_rest", resting, guards=[no_more_bounce], reset=stop_reset, priority=1))
+```
+
+## Design
+
+**Declarative definitions.** You write guards, flows, resets and invariants as plain functions of a `RuntimeContext`, and the decorators (`@guard`, `@continuous_dynamics`, `@reset`, `@invariant`) check their signatures and return types. `State` and `Transition` objects wire them into a graph. An `Automaton` adds a name, a version and a `configuration` dict, so one definition can be reused with different parameters.
+
+**One runtime, two clocks.** `await automaton.activate(...)` runs the same definition either:
+
+- in **simulation mode**, stepping a virtual clock by `delta_time` as fast as possible, or
+- in **real-time mode**, sleeping to wall-clock `dt` so it can run alongside live hardware.
+
+With `enable_self_integration=True`, the runtime integrates the flow itself (Euler or RK4). With it turned off, the continuous state is supplied from outside, for example by a sensor callback in a ROS 2 node. That makes the same automaton usable both as a simulator and as a supervisory controller.
+
+**Evaluation step.** Every tick the runtime does three things in order. It evaluates the current mode's flow and integrates it. It evaluates all outgoing guards, and if several are active the lowest priority value wins, its reset is applied, and the exit and entry callbacks run. If no transition fired, it checks the mode's invariants: a violated invariant in a final state ends the run cleanly, and anywhere else it is reported as an error. Every step returns a typed result code and severity, so failures are explicit rather than silent.
+
+**Async-native.** The clock, a timeout watchdog, samplers for continuous, auxiliary and control-input state, and the logger all run as asyncio tasks. The automaton then coexists with other coroutines, such as a ROS 2 executor bridge, without its own thread.
+
+**Reproducible runs.** Each run gets a signature (a hash of the run configuration plus a run ID) and writes structured logs to `output_dir`. `activate()` returns a `RunResult` with the run status, the termination code and message, the final discrete and continuous state, timing, transition counts and per-step statistics. It also gives the path to the logs, which hold the sampled trajectories.
+
+## Evaluation tooling
+
+The companion `hybrid_automaton_evaluation` package works on a `RunResult`:
+
+- **Visualization:** state-over-time plots, mode timelines, mode-duration and visit-count charts, transition-matrix heatmaps, and chattering detection
+- **Mode choreography analysis:** time spent in each mode, transition counts and frequencies, repeating sequences, periodic behaviour, dwell times, transition entropy, and mode-oscillation detection
+
+Together they answer questions like "how long did the vessel spend avoiding collisions?" and "is this controller chattering between two modes?"
+
+## Examples and testing
+
+There are four reference automata, each with a notebook: the **bouncing ball**, **thermostat**, **cruise control** and **traffic lights** (purely timed guards). A pytest suite covers the definition layer, the runtime and the examples themselves. GitHub Actions runs it and builds the package with Hatch.
+
+### Cruise control
+
+<SceneCanvas scene="cruise-control-automaton" height="440px" />
+
+Cruise control is where the priorities really matter. The state is `x = [v, gap]`: the ego car's speed and its distance to a lead car. The gap changes as `ġap = −(v − v_lead)`, and four modes set `v̇`:
+
+| Mode | `v̇` | Leaves when… |
+|---|---|---|
+| ACCELERATE | +2.0 m/s² | at target speed (p1) · gap < 50 m (p2) · gap < 20 m (p3) |
+| CRUISE | 0 | gap < 50 m (p1) · gap < 20 m (p2) · slow with room to spare (p3) |
+| BRAKE | −1.5 m/s² | gap < 20 m (p1) · gap > 60 m (p2) |
+| EMERGENCY_BRAKE | −5.0 m/s² | gap > 60 m (p1) |
+
+Several guards are often true at once. Any gap under 20 m is also under 50 m, for example, so the runtime's rule that the lowest priority value wins decides what happens. The readout above shows the last transition that fired, its priority, and how many other active guards it beat. The 60 m exit threshold against the 50 m entry threshold is built-in hysteresis, so the controller doesn't flip between CRUISE and BRAKE at the boundary.
+
+The phase portrait (gap vs. speed, coloured by mode) also shows something the definition doesn't make obvious. With the lead car at the default 20 m/s, the gentle 1.5 m/s² brake can't shed the 9.5 m/s closing speed within the 30 m between the two thresholds. Every cycle therefore escalates to EMERGENCY_BRAKE and the car comes to a full stop before accelerating again, a limit cycle of about 34 s. Push the lead car up to 25 m/s or more and BRAKE alone is enough. This is exactly the kind of behaviour the `hybrid_automaton_evaluation` tools are built to surface: mode occupancy and transition statistics flag it immediately.
+
+> The demo starts at a gap of 80 m. The repo's example starts at 0 m, which drops straight into EMERGENCY_BRAKE. Everything else matches `cruise_control.py`; the demo runs at 2× speed.
+
+## Limitations and roadmap
+
+Some issues I found in the v1.0.0 release pass were deliberately left for v1.1:
+
+- Reactivating an automaton with a carried-over context isn't supported yet.
+- With self-integration on, a state with no `flow` silently collapses the continuous state through numpy broadcasting. The shipped examples avoid this by giving every state an explicit flow; v1.1 should raise a clear error instead.
+- A couple of evaluation plots (auxiliary and control-input states over time) were removed from the public API rather than shipped half-finished.
+
+The next step is the ROS 2 integration this was built for, which lives in the `hybraut_*` packages.
