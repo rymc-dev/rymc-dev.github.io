@@ -71,4 +71,18 @@ export const scenes: Record<string, SceneEntry> = {
     tags: ['collision-avoidance', 'geometry'],
     load: () => import('./CpaScene'),
   },
+  'colav-closed-loop': {
+    title: 'COLAV Automaton',
+    description:
+      'Ships to riskenv risk envelope to COLREGs maneuver bias to hybrid-automaton guidance, closed loop. Virtual waypoints, Fallback, and a stress-test scenario. Click for the next scenario.',
+    tags: ['collision-avoidance', 'hybrid-systems', 'colregs'],
+    load: () => import('./ColavScene'),
+  },
+  'colregs-classifier': {
+    title: 'COLREGs Encounter Classifier',
+    description:
+      'Rules 13, 14, 15, 17 and 18 as geometry: place a ship around the agent and watch the encounter, give-way / stand-on role and urgency update. Click to change its course and type.',
+    tags: ['colregs', 'marine-robotics'],
+    load: () => import('./ColregsScene'),
+  },
 };

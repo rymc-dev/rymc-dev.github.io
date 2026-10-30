@@ -1,0 +1,111 @@
+---
+title: 'colav-automaton: COLREGs-Aware Collision Avoidance'
+summary: 'A maritime collision-avoidance controller for USVs, built as a hybrid automaton on hybrid-automaton, steering around riskenv risk envelopes with COLREGs-informed virtual waypoints.'
+date: 2026-08-18
+tags: ['python', 'collision-avoidance', 'colregs', 'hybrid-systems', 'marine-robotics']
+repo: 'https://github.com/rymc-dev/colav-automaton'
+scene: 'colav-closed-loop'
+featured: true
+---
+
+import SceneCanvas from '../../components/three/SceneCanvas.astro';
+
+## Overview
+
+`colav-automaton` is where my two libraries meet. It steers an uncrewed surface vessel (USV) to a goal while keeping clear of other ships:
+
+- **[riskenv](/projects/riskenv/)** turns surrounding traffic into a convex **unsafe region**: the Risk Envelope.
+- A **COLREGs classification** layer works out _which way_ the rules of the road say to pass, and how urgently.
+- A **hybrid automaton** built on **[hybrid-automaton](/projects/hybrid-automaton/)** follows line-of-sight guidance to the goal. Whenever the direct path is blocked, it generates a temporary **virtual waypoint** around the envelope.
+
+There's no pre-planned path. Avoidance comes entirely from guards firing against live data. The package is on PyPI (v1.0.6), and is ready for simulation and ROS 2 hardware-in-the-loop testing:
+
+```console
+pip install colav-automaton
+```
+
+## The demo above
+
+The scene runs the whole pipeline, closed loop, with a TypeScript port of `colav-automaton`, `riskenv` and the runtime's evaluation step. Every 0.1 s tick:
+
+1. The ships move.
+2. `riskenv.create_unsafe_set` rebuilds the **unsafe region** (magenta hull) from them.
+3. `classify_unsafe_set_obstacles` produces the **`maneuver_bias`**: a side, an urgency, and the COLREGs rule behind it (bottom lines of the readout).
+4. `ColavAutomaton` takes one evaluation step with both as `AuxiliaryState`s.
+
+The **line of sight** to the current waypoint turns magenta when its guard fires. The yellow octahedron is the **virtual waypoint**, and the green one is the goal. The scenarios cycle automatically; **click to skip ahead**:
+
+- **Head-on (Rule 14):** both alter to starboard.
+- **Crossing, give way (Rule 15):** the other ship is on our starboard bow, so we keep clear.
+- **Crossing from port, fishing vessel (Rules 17 + 18):** geometrically we'd stand on, but a vessel engaged in fishing outranks us under Rule 18, so we give way anyway.
+- **Stress test:** the 3-ship scenario from the repo's own `generate_unsafe_set.py`. It fails, and the [engineering note](#engineering-note-the-stress-test) below explains why.
+
+## The automaton
+
+Three discrete states, over the continuous state `[x, y, θ, v, yaw_rate]`:
+
+| State | Flow | Meaning |
+|---|---|---|
+| **Transit** (initial) | LOS heading control: `θ̇ = k_θ · wrap(atan2(Δy, Δx) − θ)`, `v̇ = k_v (v_des − v)` | under way, always steering at the current waypoint |
+| **Fallback** | brake to a stop on the current heading: `v̇ = −k_v v` | the safety circle touches the unsafe region, so stop re-planning and hold |
+| **Waypoint_Reached** (final) | constant heading | pop a queued virtual waypoint, or finish |
+
+| Edge | From → To | Guard | Reset | Priority |
+|---|---|---|---|---|
+| e1 | Transit → Waypoint_Reached | within `acceptance_radius` of the waypoint | | 0 |
+| e3 | Transit → Transit | LOS to the waypoint hits the unsafe region within `los_distance_threshold` | `generate_new_virtual_waypoint` | 1 |
+| e2 | Transit → Fallback | safety circle intersects the unsafe region | | 2 |
+| e4 | Fallback → Transit | safety circle clear again | | 0 |
+| e5 | Waypoint_Reached → Transit | a virtual waypoint is still queued | `pop_virtual_waypoint` | 0 |
+
+The priorities carry real meaning. `los_distance_threshold` is normally a larger radius than the safety radius, but at speed or with a coarse `dt`, both e3 and e2 can come true in the same step. **e3 outranks e2**, so the reroute always gets first refusal, and Fallback only happens when rerouting genuinely isn't available. Fallback is also bounded: `fallback_recoverable_invariant` lets it idle for up to `fallback_timeout` (30 s). After that the invariant fails and the run ends as a FAILURE rather than waiting forever behind an obstacle that never moves. In a ROS 2 deployment, that surfaces as an aborted mission leg.
+
+### Virtual waypoints
+
+When e3 fires, `generate_new_virtual_waypoint` places the detour:
+
+1. It finds the unsafe-region vertices **visible** from the agent, i.e. those whose sight line doesn't cross the polygon, and takes the starboard-most and port-most of them relative to the agent's heading.
+2. **With no COLREGs input**, it picks whichever side is cheaper to reach. The cost is `50 · |heading change| + distance`, so a 1 rad turn is worth about a 50 m detour, and starboard wins ties.
+3. **With a `maneuver_bias`**, the COLREGs side overrides the geometric choice, and the urgency widens the berth. The offset from the vertex is `lateral_offset_distance · (1 + urgency)`, perpendicular to the agent→goal line.
+4. A queued virtual waypoint is **replaced, never stacked**. Repeated reroutes would otherwise pile up a chain of detours that the vessel then has to unwind one leg at a time.
+
+## COLREGs classification
+
+<SceneCanvas scene="colregs-classifier" height="440px" />
+
+`colav_automaton.classification` turns each nearby ship into a `Maneuver` from geometry alone: our bearing to it, its bearing to us, and the difference in heading. **Move to place the other ship. Click to switch its course (toward us / same as ours) and type (cargo / fishing).**
+
+- **Rule 14, head-on:** each ship within ±15° of the other's bow, and headings within 30° of reciprocal. Alter to starboard (urgency 0.9).
+- **Rule 13, overtaking:** similar heading, with one ship more than 112.5° abaft the other's beam. The overtaking ship gives way (0.5); the overtaken one stands on (0.1).
+- **Rule 15 / 17, crossing:** the other ship on our starboard bow means we give way (0.8). On our port bow we stand on (0.15), keeping a starboard default if forced to act.
+- **Rule 18, vessel type:** an AIS-style type tag (`"fishing boat"`, `"super tanker"`, `"sail"`…) maps to a right-of-way category. Anything that outranks a power-driven vessel turns stand-on into give-way and raises the urgency.
+- **Proximity:** riskenv's DCPA adds up to +0.3 urgency as the predicted miss distance shrinks toward the combined safety radii.
+
+With several ships, `classify_unsafe_set_obstacles` first re-applies **riskenv's own I1/I2/I3 filters**, so only ships that actually built the unsafe region get a vote. Otherwise a distant head-on ship (base urgency 0.9) could outvote a closer, genuinely dangerous crossing. The highest urgency wins, and starboard breaks ties.
+
+This is a practical approximation, not a certified rule engine. Restricted visibility (Rule 19), sound and light signals, and true multi-vessel arbitration are out of scope.
+
+## Engineering note: the stress test
+
+Porting the package to TypeScript for this page meant re-deriving every guard. Running the repo's own 3-ship example (`generate_unsafe_set.py`) through the port surfaced a failure:
+
+1. At about 3 s, e3 reroutes around a hull stretched along the line of sight by the head-on cargo ship's predicted position (riskenv adds a circle at TCPA).
+2. About 2 s later, the 15 m safety circle touches the hull's near edge, and e2 drops into **Fallback**.
+3. Fallback brakes to a stop. The fishing boat keeps closing, and after 30 s the run ends as a **FAILURE**.
+
+The cause is in `los_clear_to_waypoint_guard`. It measures `los_distance_threshold` to the **midpoint of the overlap** between the line of sight and the hull (the yellow marker and distance in the demo), not to where the line of sight **enters** the hull (the small cyan marker). When a predicted-CPA circle stretches the hull along the line of sight, the midpoint sits far inside it. The reroute fires late, because the threshold looks satisfied while the near edge is already close.
+
+In the port, measuring to the entry point instead is a one-line change. With it, the same scenario reaches the goal **without ever entering Fallback**, keeping at least 45 m from every ship, and the three single-ship scenarios still succeed. It is a candidate fix for the package, still to be confirmed against the Python implementation.
+
+## Engineering
+
+- **Thin automaton, testable pieces:** guards, resets, invariants, flows and classification live in separate modules, with pytest suites for each.
+- **Documented contracts:** every guard has a Mermaid flowchart and an input/output truth table under `docs/guards/`. The shared `RuntimeContext` data contract (which `continuous_state` indices and `auxiliary_states` keys each function reads) is documented in one table.
+- **Integration-ready:** waypoints, the unsafe region and the maneuver bias are all just `AuxiliaryState` updates. A ROS 2 node can feed AIS and perception into them without restarting the automaton, which is the pattern this demo runs every tick.
+- **CI/CD:** GitHub Actions runs the tests, builds, and publishes to PyPI.
+
+## Limitations
+
+- **Not validated on a physical vessel yet.** It's ready for simulation and hardware-in-the-loop testing.
+- **COLREGs coverage is geometric:** Rules 13/14/15/17/18 only, with highest-urgency-wins for multiple ships.
+- **Fallback is conservative:** it brakes and waits, with no active re-planning while too close. That's safe for static obstacles but, as the stress test shows, not for traffic that keeps closing.
