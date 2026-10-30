@@ -43,4 +43,18 @@ export const scenes: Record<string, SceneEntry> = {
     tags: ['hybrid-systems', 'control'],
     load: () => import('./CruiseControlScene'),
   },
+  'thermostat-chattering': {
+    title: 'Hybrid Automaton: Thermostat Chattering',
+    description:
+      'A thermostat whose exit guards sit on its entry thresholds, so it switches modes about 80 times a second. Move to set the ambient temperature; click to add hysteresis.',
+    tags: ['hybrid-systems', 'control'],
+    load: () => import('./ThermostatScene'),
+  },
+  'traffic-light-context': {
+    title: 'Hybrid Automaton: RuntimeContext Inspector',
+    description:
+      'A traffic light with no continuous state at all: every guard reads the runtime clock. Watch the live RuntimeContext and guard values; move to set time_in_green, click to switch clocks.',
+    tags: ['hybrid-systems', 'runtime'],
+    load: () => import('./TrafficLightScene'),
+  },
 };

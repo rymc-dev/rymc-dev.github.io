@@ -127,17 +127,23 @@ export function makeLabel(width: number, height: number, scale: number) {
   );
   sprite.scale.set((width / height) * scale, scale, 1);
   let last = '';
-  const draw = (lines: string[], color: number, size = 34) => {
-    const key = lines.join('\n') + color;
+  const hex = (color: number) => `#${color.toString(16).padStart(6, '0')}`;
+  /** Each line is plain text in `color`, or a [text, color] pair. */
+  const draw = (lines: (string | [string, number])[], color: number, size = 34, align: 'center' | 'left' = 'center') => {
+    const key = JSON.stringify(lines) + color + align;
     if (key === last) return;
     last = key;
     ctx.clearRect(0, 0, width, height);
     ctx.font = `${size}px 'JetBrains Mono', ui-monospace, monospace`;
-    ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
-    ctx.textAlign = 'center';
+    ctx.textAlign = align;
     ctx.textBaseline = 'middle';
     const lh = size * 1.25;
-    lines.forEach((l, i) => ctx.fillText(l, width / 2, height / 2 + (i - (lines.length - 1) / 2) * lh));
+    const x = align === 'left' ? size * 0.5 : width / 2;
+    lines.forEach((l, i) => {
+      const [text, c] = typeof l === 'string' ? [l, color] : l;
+      ctx.fillStyle = hex(c);
+      ctx.fillText(text, x, height / 2 + (i - (lines.length - 1) / 2) * lh);
+    });
     texture.needsUpdate = true;
   };
   return { sprite, texture, draw };

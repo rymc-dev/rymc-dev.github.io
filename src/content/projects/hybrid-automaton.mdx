@@ -81,6 +81,27 @@ With `enable_self_integration=True`, the runtime integrates the flow itself (Eul
 
 **Reproducible runs.** Each run gets a signature (a hash of the run configuration plus a run ID) and writes structured logs to `output_dir`. `activate()` returns a `RunResult` with the run status, the termination code and message, the final discrete and continuous state, timing, transition counts and per-step statistics. It also gives the path to the logs, which hold the sampled trajectories.
 
+### Inside the RuntimeContext: the traffic light
+
+<SceneCanvas scene="traffic-light-context" height="460px" />
+
+Every guard, flow, reset and invariant takes one argument: the `RuntimeContext`. The traffic-light example shows why that matters. It has **no continuous state at all**: it runs with `initial_continuous_state=None` and `enable_self_integration=False`. Its guards read data the runtime itself maintains:
+
+```python
+@guard
+def green_to_yellow_guard(ctx: RuntimeContext) -> bool:
+    return ctx.clock.get_time_elapsed_since_transition() >= ctx.configuration['time_in_green']
+```
+
+The panels above show that context live:
+
+- **`ctx.clock`** tracks the total active time and the time since the last transition. When a transition fires, the runtime calls `ping_transition()` and the second timer resets to zero (highlighted in yellow). The ring around the lit lamp is that timer divided by the threshold, i.e. the guard's progress toward true.
+- **`ctx.configuration`** is the dict passed to `Automaton(...)`. Guards read their thresholds from it rather than hard-coding them. **Move across the scene to change `time_in_green`** and the next green phase follows it.
+- **Guard evaluation** is per mode: only the current mode's outgoing guards are evaluated each step. The others are marked "not evaluated".
+- **`transitions_count` and `total_steps`** are the statistics that end up in the `RunResult`.
+
+**Click the scene to switch between the two clocks.** In simulation mode the clock steps `dt` as fast as the loop can go (capped at 12× here so it stays readable). In real-time mode it follows the wall clock. The automaton definition is identical in both. The same split lets a ROS 2 node feed timers, sensor data (`auxiliary_states`) or commands (`control_input_states`) into the context and have guards react to them without the automaton knowing where the data came from.
+
 ## Evaluation tooling
 
 The companion `hybrid_automaton_evaluation` package works on a `RunResult`:
@@ -88,11 +109,21 @@ The companion `hybrid_automaton_evaluation` package works on a `RunResult`:
 - **Visualization:** state-over-time plots, mode timelines, mode-duration and visit-count charts, transition-matrix heatmaps, and chattering detection
 - **Mode choreography analysis:** time spent in each mode, transition counts and frequencies, repeating sequences, periodic behaviour, dwell times, transition entropy, and mode-oscillation detection
 
-Together they answer questions like "how long did the vessel spend avoiding collisions?" and "is this controller chattering between two modes?"
+### Catching chattering: the thermostat
+
+<SceneCanvas scene="thermostat-chattering" height="440px" />
+
+The repo's thermostat example looks harmless: IDLE starts heating below 18 °C and cooling above 22 °C, and both return to IDLE once the temperature is back inside 18–22 °C. But the exit guard sits *exactly* on the entry threshold. When the room is colder than 18 °C, IDLE drifts just below 18, HEATING lifts it just above, and the automaton flips between the two every step or two. At the example's `delta_time` of 0.01 s that is **about 80 mode switches per second**, while the temperature hovers at 17.99 °C.
+
+This is **chattering**, a classic failure in hybrid systems. A simulation won't complain about it. Real hardware won't take it: a heater relay cycling 80 times a second would burn through its rated life in minutes. It's exactly what `chattering_detection_fig` and `detect_mode_oscillations` are for: in the demo, the mode timeline under the trace turns into a dense band of stripes and the switch-rate readout climbs.
+
+**Click the scene to add hysteresis.** HEATING and COOLING then run on to a 20 °C set point before handing back to IDLE, and the switch rate drops from ~80/s to ~1/s. It's the same fix the cruise-control automaton below uses, with its 50 m entry and 60 m exit thresholds. Move across the scene to set the ambient temperature; between 18 and 22 °C nothing switches at all.
+
+> With hysteresis off, the demo is a direct port of `thermostat.py`. Mode switches are shown as time-averaged glow rather than per-switch flashes, because blinking at 80 Hz would be a photosensitivity hazard.
 
 ## Examples and testing
 
-There are four reference automata, each with a notebook: the **bouncing ball**, **thermostat**, **cruise control** and **traffic lights** (purely timed guards). A pytest suite covers the definition layer, the runtime and the examples themselves. GitHub Actions runs it and builds the package with Hatch.
+There are four reference automata, each with a notebook: the **bouncing ball**, **traffic lights** and **thermostat** (all above) and **cruise control** (below). A pytest suite covers the definition layer, the runtime and the examples themselves. GitHub Actions runs it and builds the package with Hatch.
 
 ### Cruise control
 
