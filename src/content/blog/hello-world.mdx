@@ -1,0 +1,33 @@
+---
+title: 'Hello, world: robotics notes'
+description: 'Why this blog exists, what I plan to write about, and a quick look at embedding live 3D scenes in posts.'
+pubDate: 2026-10-30
+tags: ['meta', 'three.js']
+---
+
+import SceneCanvas from '../../components/three/SceneCanvas.astro';
+
+Welcome to my engineering log. I'll use this space to write up things I learn building robot
+software: ROS 2 patterns, perception pipelines, control loops that misbehaved, and the tools I build along the way.
+
+## Live scenes in posts
+
+Posts are written in MDX, so I can drop an interactive Three.js scene straight into the text. Move your cursor
+over the arm below:
+
+<SceneCanvas scene="robot-arm" height="360px" />
+
+The arm solves a two-link inverse kinematics problem every frame. With link lengths `L1` and `L2` and a target
+at distance `d`, the elbow angle comes from the law of cosines:
+
+```cpp
+// elbow interior angle
+double gamma = std::acos((L1*L1 + L2*L2 - d*d) / (2.0 * L1 * L2));
+double q3 = M_PI - gamma;
+```
+
+## What's next
+
+- Notes on structuring a ROS 2 workspace
+- Debugging TF trees without losing your mind
+- More scenes in the [Lab](/lab/)

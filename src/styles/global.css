@@ -1,0 +1,300 @@
+/* ---------- Design tokens ---------- */
+:root {
+  --bg: #0a0a12;
+  --bg-panel: #11111c;
+  --bg-panel-2: #171726;
+  --line: #24243a;
+  --text: #e6e6f0;
+  --muted: #8a8aa3;
+  --cyan: #00f0ff;
+  --magenta: #ff2bd6;
+  --yellow: #f5ff3b;
+
+  --font-display: 'Orbitron', 'Eurostile', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --max-w: 72rem;
+  --gutter: clamp(1rem, 4vw, 2rem);
+  --cut: 14px; /* clipped-corner size */
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg);
+  /* faint engineering grid */
+  background-image:
+    linear-gradient(rgba(0, 240, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.035) 1px, transparent 1px);
+  background-size: 40px 40px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* CRT scanlines */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.018) 0,
+    rgba(255, 255, 255, 0.018) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 2rem var(--gutter) 4rem;
+}
+
+/* ---------- Typography ---------- */
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  margin: 2rem 0 1rem;
+}
+h1 {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+}
+h2 {
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
+}
+h3 {
+  font-size: 1.1rem;
+}
+
+a {
+  color: var(--cyan);
+  text-decoration: none;
+  transition: color 0.15s, text-shadow 0.15s;
+}
+a:hover {
+  color: var(--magenta);
+  text-shadow: 0 0 8px rgba(255, 43, 214, 0.6);
+}
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--magenta);
+  color: var(--bg);
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--line);
+  padding: 0.1em 0.35em;
+}
+pre {
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--cyan);
+}
+pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+blockquote {
+  margin: 1.5rem 0;
+  padding: 0.5rem 1.25rem;
+  border-left: 3px solid var(--magenta);
+  color: var(--muted);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+hr {
+  border: 0;
+  border-top: 1px dashed var(--line);
+  margin: 2.5rem 0;
+}
+
+/* ---------- Utilities ---------- */
+.muted {
+  color: var(--muted);
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+.eyebrow::before {
+  content: '// ';
+  color: var(--magenta);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 4rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.section-head h2 {
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: 1.25rem;
+}
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut))
+  );
+}
+
+.btn {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.7rem 1.3rem;
+  color: var(--bg);
+  background: var(--cyan);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.btn:hover {
+  color: var(--bg);
+  background: var(--magenta);
+  text-shadow: none;
+}
+/* outlined variant: a 1px inset copy of the same clipped shape draws the border */
+.btn--ghost {
+  position: relative;
+  background: var(--cyan);
+  color: var(--cyan);
+  isolation: isolate;
+}
+.btn--ghost::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  background: var(--bg);
+  clip-path: inherit;
+}
+.btn--ghost:hover {
+  background: var(--magenta);
+  color: var(--magenta);
+}
+.btn--ghost:hover::before {
+  background: #1a0d1c;
+}
+
+/* glitch text: <span class="glitch" data-text="...">...</span> */
+.glitch {
+  position: relative;
+  display: inline-block;
+  text-shadow: 0 0 18px rgba(0, 240, 255, 0.35);
+}
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.glitch::before {
+  color: var(--magenta);
+  transform: translate(-2px, 0);
+  clip-path: inset(0 0 60% 0);
+  animation: glitch-a 3.5s infinite steps(1);
+  opacity: 0.8;
+}
+.glitch::after {
+  color: var(--cyan);
+  transform: translate(2px, 0);
+  clip-path: inset(55% 0 0 0);
+  animation: glitch-b 4.2s infinite steps(1);
+  opacity: 0.8;
+}
+@keyframes glitch-a {
+  0%, 92%, 100% { transform: translate(0); clip-path: inset(0 0 100% 0); }
+  93% { transform: translate(-3px, 1px); clip-path: inset(10% 0 55% 0); }
+  95% { transform: translate(3px, -1px); clip-path: inset(40% 0 30% 0); }
+  97% { transform: translate(-2px, 0); clip-path: inset(70% 0 5% 0); }
+}
+@keyframes glitch-b {
+  0%, 88%, 100% { transform: translate(0); clip-path: inset(100% 0 0 0); }
+  89% { transform: translate(3px, 0); clip-path: inset(60% 0 10% 0); }
+  91% { transform: translate(-3px, 1px); clip-path: inset(20% 0 60% 0); }
+}
+
+.prose {
+  max-width: 46rem;
+}
+.prose p,
+.prose li {
+  color: #cfcfe0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

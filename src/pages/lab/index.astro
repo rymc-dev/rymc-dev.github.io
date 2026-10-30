@@ -1,0 +1,64 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SceneCanvas from '../../components/three/SceneCanvas.astro';
+import Tag from '../../components/Tag.astro';
+import { scenes } from '../../components/three/scenes';
+---
+
+<BaseLayout title="Lab" description="Interactive Three.js robotics experiments.">
+  <p class="eyebrow">sandbox</p>
+  <h1>Lab</h1>
+  <p class="muted">Interactive 3D robotics experiments built with Three.js. Each one runs live in your browser.</p>
+
+  <div class="lab">
+    {
+      Object.entries(scenes).map(([id, s]) => (
+        <section class="panel exp" id={id}>
+          <SceneCanvas scene={id} height="380px" />
+          <div class="info">
+            <h2>{s.title}</h2>
+            <p class="muted">{s.description}</p>
+            <div class="tags">
+              {s.tags.map((t) => (
+                <Tag name={t} />
+              ))}
+            </div>
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .lab {
+    display: grid;
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+  .exp {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+  }
+  .info {
+    padding: 1.5rem;
+    border-left: 1px solid var(--line);
+  }
+  .info h2 {
+    margin-top: 0;
+  }
+  .tags {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+  @media (max-width: 760px) {
+    .exp {
+      grid-template-columns: 1fr;
+    }
+    .info {
+      border-left: 0;
+      border-top: 1px solid var(--line);
+    }
+  }
+</style>

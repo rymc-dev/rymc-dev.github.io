@@ -1,0 +1,75 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SITE } from '../consts';
+
+const skills = {
+  Robotics: ['ROS 2', 'Nav2', 'MoveIt 2', 'tf2', 'URDF / Xacro'],
+  Languages: ['C++17/20', 'Python', 'Rust', 'Bash'],
+  'Perception & Planning': ['OpenCV', 'PCL', 'SLAM', 'state estimation', 'motion planning'],
+  'Sim & Tools': ['Gazebo', 'Isaac Sim', 'Docker', 'CI/CD', 'Linux'],
+};
+---
+
+<BaseLayout title="About" description={`About ${SITE.name}, ${SITE.role}.`}>
+  <div class="prose">
+    <p class="eyebrow">whoami</p>
+    <h1>About</h1>
+    <p>
+      I'm {SITE.name}, a robotics software engineer. <!-- TODO: write your bio --> I like working on the parts of a
+      robot where software meets the physical world: getting sensors to agree, getting plans to run on real
+      hardware, and building the tools that make that easier.
+    </p>
+    <p>
+      This site is where I write up projects, keep engineering notes, and put interactive 3D experiments in the
+      <a href="/lab/">Lab</a>.
+    </p>
+
+    <h2>Toolbox</h2>
+    <div class="skills">
+      {
+        Object.entries(skills).map(([group, items]) => (
+          <div class="panel group">
+            <h3>{group}</h3>
+            <ul>
+              {items.map((s) => (
+                <li>{s}</li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+
+    <h2>Contact</h2>
+    <p>
+      Email <code>{SITE.email}</code> · <a href={SITE.github}>GitHub</a> · <a href={SITE.linkedin}>LinkedIn</a>
+    </p>
+    <p><a class="btn btn--ghost" href="/cv.pdf">Download CV</a></p>
+  </div>
+</BaseLayout>
+
+<style>
+  .skills {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+    gap: 1rem;
+  }
+  .group {
+    padding: 1rem 1.25rem;
+  }
+  .group h3 {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+    color: var(--cyan);
+  }
+  .group ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.85rem;
+  }
+  .group li::before {
+    content: '▸ ';
+    color: var(--magenta);
+  }
+</style>

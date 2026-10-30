@@ -1,0 +1,151 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Card from '../components/Card.astro';
+import SceneCanvas from '../components/three/SceneCanvas.astro';
+import { SITE } from '../consts';
+
+const projects = (await getCollection('projects'))
+  .filter((p) => p.data.featured)
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+  .slice(0, 3);
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+  .slice(0, 3);
+---
+
+<BaseLayout>
+  <section class="hero">
+    <div class="intro">
+      <p class="eyebrow">{SITE.role}</p>
+      <h1><span class="glitch" data-text={SITE.name}>{SITE.name}</span></h1>
+      <p class="tagline">
+        I write software that makes machines <span class="hl">perceive</span>, <span class="hl">plan</span> and{' '}
+        <span class="hl">move</span>. ROS 2, C++, Python, simulation and the occasional soldering iron.
+      </p>
+      <div class="cta">
+        <a class="btn" href="/projects/">View projects</a>
+        <a class="btn btn--ghost" href="/blog/">Read the blog</a>
+      </div>
+      <dl class="stats">
+        <div><dt>stack</dt><dd>ROS 2 · C++ · Python</dd></div>
+        <div><dt>focus</dt><dd>autonomy · perception · control</dd></div>
+        <div><dt>status</dt><dd class="ok">open to opportunities</dd></div>
+      </dl>
+    </div>
+    <div class="viz panel">
+      <SceneCanvas scene="robot-arm" height="100%" />
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Featured projects</h2>
+      <a href="/projects/">all projects →</a>
+    </div>
+    <div class="grid">
+      {
+        projects.map((p) => (
+          <Card
+            href={`/projects/${p.id}/`}
+            title={p.data.title}
+            description={p.data.summary}
+            tags={p.data.tags}
+            kicker="project"
+          />
+        ))
+      }
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Latest posts</h2>
+      <a href="/blog/">all posts →</a>
+    </div>
+    <div class="grid">
+      {
+        posts.map((p) => (
+          <Card
+            href={`/blog/${p.id}/`}
+            title={p.data.title}
+            description={p.data.description}
+            date={p.data.pubDate}
+            tags={p.data.tags}
+            kicker="log"
+          />
+        ))
+      }
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr;
+    gap: 2rem;
+    align-items: center;
+    min-height: min(80vh, 44rem);
+  }
+  .hero h1 {
+    margin: 0.25rem 0 1rem;
+    font-size: clamp(2.4rem, 7vw, 4.5rem);
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+  .tagline {
+    color: #cfcfe0;
+    font-size: 1.05rem;
+    max-width: 34rem;
+  }
+  .hl {
+    color: var(--cyan);
+  }
+  .cta {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin: 1.75rem 0;
+  }
+  .stats {
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    margin: 0;
+  }
+  .stats div {
+    display: flex;
+    gap: 0.75rem;
+  }
+  .stats dt {
+    color: var(--magenta);
+    min-width: 4.5rem;
+  }
+  .stats dt::after {
+    content: ':';
+  }
+  .stats dd {
+    margin: 0;
+    color: var(--muted);
+  }
+  .stats .ok {
+    color: #3bff9d;
+  }
+  .viz {
+    height: clamp(320px, 60vh, 560px);
+    background:
+      radial-gradient(ellipse at 50% 70%, rgba(0, 240, 255, 0.08), transparent 60%),
+      var(--bg-panel);
+  }
+  @media (max-width: 860px) {
+    .hero {
+      grid-template-columns: 1fr;
+      min-height: 0;
+    }
+    .viz {
+      height: 340px;
+    }
+  }
+</style>

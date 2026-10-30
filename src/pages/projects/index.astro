@@ -1,0 +1,27 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Card from '../../components/Card.astro';
+
+const projects = (await getCollection('projects')).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+---
+
+<BaseLayout title="Projects" description="Robotics software projects.">
+  <p class="eyebrow">build log</p>
+  <h1>Projects</h1>
+  <p class="muted">Things I've designed, built and debugged.</p>
+  <div class="grid">
+    {
+      projects.map((p) => (
+        <Card
+          href={`/projects/${p.id}/`}
+          title={p.data.title}
+          description={p.data.summary}
+          date={p.data.date}
+          tags={p.data.tags}
+          kicker={p.data.scene ? 'project · 3d' : 'project'}
+        />
+      ))
+    }
+  </div>
+</BaseLayout>

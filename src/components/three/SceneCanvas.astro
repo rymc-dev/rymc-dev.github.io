@@ -1,0 +1,99 @@
+---
+import { scenes } from './scenes';
+
+interface Props {
+  scene: string;
+  /** CSS height of the viewport, e.g. "420px" or "60vh" */
+  height?: string;
+  /** Show the HUD caption in the corner */
+  hud?: boolean;
+  class?: string;
+}
+
+const { scene, height = '420px', hud = true, class: className } = Astro.props;
+const entry = scenes[scene];
+if (!entry) throw new Error(`Unknown scene "${scene}". Register it in src/components/three/scenes.ts`);
+---
+
+<div class:list={['scene-frame', className]} data-scene={scene} style={`--scene-h: ${height}`}>
+  <canvas aria-label={`Interactive 3D scene: ${entry.title}`} role="img"></canvas>
+  {
+    hud && (
+      <div class="hud" aria-hidden="true">
+        <span>SIM://{scene}</span>
+        <span class="state">loading…</span>
+      </div>
+    )
+  }
+  <noscript><p class="fallback">This 3D scene needs JavaScript.</p></noscript>
+</div>
+
+<script>
+  import { scenes } from './scenes';
+
+  const mount = async (el: HTMLElement) => {
+    const state = el.querySelector('.state');
+    const canvas = el.querySelector('canvas')!;
+    try {
+      const mod = await scenes[el.dataset.scene!].load();
+      mod.mount(canvas);
+      if (state) state.textContent = '● live';
+      el.dataset.ready = '';
+    } catch (err) {
+      console.error(err);
+      if (state) state.textContent = '✕ WebGL unavailable';
+    }
+  };
+
+  // only download Three.js + the scene once it's near the viewport
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        io.unobserve(e.target);
+        mount(e.target as HTMLElement);
+      }
+    },
+    { rootMargin: '200px' },
+  );
+  document.querySelectorAll<HTMLElement>('.scene-frame').forEach((el) => io.observe(el));
+</script>
+
+<style>
+  .scene-frame {
+    position: relative;
+    width: 100%;
+    height: var(--scene-h);
+    max-width: 100%;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: pan-y;
+  }
+  .hud {
+    position: absolute;
+    left: 0.75rem;
+    bottom: 0.6rem;
+    display: flex;
+    gap: 1rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .state {
+    color: var(--yellow);
+  }
+  [data-ready] .state {
+    color: #3bff9d;
+  }
+  .fallback {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+  }
+</style>

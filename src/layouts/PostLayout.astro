@@ -1,0 +1,77 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import Tag from '../components/Tag.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  date: Date;
+  tags?: string[];
+  kicker: string;
+  back: { href: string; label: string };
+  links?: { href: string; label: string }[];
+}
+
+const { title, description, date, tags = [], kicker, back, links = [] } = Astro.props;
+---
+
+<BaseLayout title={title} description={description}>
+  <article class="prose">
+    <a class="back" href={back.href}>← {back.label}</a>
+    <header>
+      <p class="eyebrow">{kicker}</p>
+      <h1>{title}</h1>
+      <p class="lede">{description}</p>
+      <div class="meta">
+        <time datetime={date.toISOString()}>{date.toISOString().slice(0, 10)}</time>
+        {tags.map((t) => <Tag name={t} />)}
+      </div>
+      {
+        links.length > 0 && (
+          <div class="links">
+            {links.map((l) => (
+              <a class="btn btn--ghost" href={l.href}>
+                {l.label}
+              </a>
+            ))}
+          </div>
+        )
+      }
+    </header>
+    <hr />
+    <slot />
+  </article>
+</BaseLayout>
+
+<style>
+  .back {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  header h1 {
+    margin-top: 0.5rem;
+  }
+  .lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+  }
+  .meta {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .links {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+  }
+  article :global(.scene-frame) {
+    margin: 2rem 0;
+    border: 1px solid var(--line);
+    background: var(--bg-panel);
+  }
+</style>

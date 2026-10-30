@@ -1,0 +1,19 @@
+---
+interface Props {
+  name: string;
+}
+const { name } = Astro.props;
+---
+
+<span class="tag">#{name}</span>
+
+<style>
+  .tag {
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    color: var(--yellow);
+    border: 1px solid rgba(245, 255, 59, 0.3);
+    padding: 0.05rem 0.45rem;
+    white-space: nowrap;
+  }
+</style>

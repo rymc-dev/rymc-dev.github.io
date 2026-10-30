@@ -1,0 +1,38 @@
+---
+import { SITE } from '../consts';
+const year = new Date().getFullYear();
+---
+
+<footer>
+  <div class="inner">
+    <span class="muted">© {year} {SITE.name} · <span class="status">● online</span></span>
+    <span class="links">
+      <a href={SITE.github} rel="me">GitHub</a>
+      <a href={SITE.linkedin} rel="me">LinkedIn</a>
+      <a href="/rss.xml">RSS</a>
+    </span>
+  </div>
+</footer>
+
+<style>
+  footer {
+    border-top: 1px solid var(--line);
+    font-size: 0.8rem;
+  }
+  .inner {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: 1.5rem var(--gutter);
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .status {
+    color: #3bff9d;
+  }
+  .links {
+    display: flex;
+    gap: 1.25rem;
+  }
+</style>

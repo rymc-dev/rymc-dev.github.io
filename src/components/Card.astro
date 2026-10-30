@@ -1,0 +1,83 @@
+---
+import Tag from './Tag.astro';
+
+interface Props {
+  href: string;
+  title: string;
+  description: string;
+  date?: Date;
+  tags?: string[];
+  kicker?: string;
+}
+const { href, title, description, date, tags = [], kicker } = Astro.props;
+---
+
+<a class="card panel" href={href}>
+  <div class="meta">
+    {kicker && <span class="kicker">{kicker}</span>}
+    {date && <time datetime={date.toISOString()}>{date.toISOString().slice(0, 10)}</time>}
+  </div>
+  <h3>{title}</h3>
+  <p>{description}</p>
+  {tags.length > 0 && <div class="tags">{tags.map((t) => <Tag name={t} />)}</div>}
+</a>
+
+<style>
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1.25rem 1.4rem 1.4rem;
+    color: var(--text);
+    position: relative;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--cyan);
+    opacity: 0.4;
+    transition: opacity 0.2s, background 0.2s;
+  }
+  .card:hover {
+    color: var(--text);
+    text-shadow: none;
+    background: var(--bg-panel-2);
+    transform: translateY(-2px);
+  }
+  .card:hover::before {
+    opacity: 1;
+    background: var(--magenta);
+    box-shadow: 0 0 12px var(--magenta);
+  }
+  .meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .kicker {
+    color: var(--cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  h3 {
+    margin: 0;
+  }
+  p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+    flex: 1;
+  }
+  .tags {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 0.4rem;
+  }
+</style>

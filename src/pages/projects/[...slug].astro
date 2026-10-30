@@ -1,0 +1,31 @@
+---
+import { getCollection, render } from 'astro:content';
+import PostLayout from '../../layouts/PostLayout.astro';
+import SceneCanvas from '../../components/three/SceneCanvas.astro';
+
+export async function getStaticPaths() {
+  const projects = await getCollection('projects');
+  return projects.map((project) => ({ params: { slug: project.id }, props: { project } }));
+}
+
+const { project } = Astro.props;
+const { Content } = await render(project);
+const { repo, demo, scene } = project.data;
+const links = [
+  ...(repo ? [{ href: repo, label: 'Source' }] : []),
+  ...(demo ? [{ href: demo, label: 'Demo' }] : []),
+];
+---
+
+<PostLayout
+  title={project.data.title}
+  description={project.data.summary}
+  date={project.data.date}
+  tags={project.data.tags}
+  kicker="project"
+  back={{ href: '/projects/', label: 'all projects' }}
+  links={links}
+>
+  {scene && <SceneCanvas scene={scene} />}
+  <Content />
+</PostLayout>

@@ -1,0 +1,29 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Card from '../../components/Card.astro';
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+);
+---
+
+<BaseLayout title="Blog" description="Engineering notes on robotics software.">
+  <p class="eyebrow">engineering log</p>
+  <h1>Blog</h1>
+  <p class="muted">Notes on robotics software, things I've broken, and how I fixed them.</p>
+  <div class="grid">
+    {
+      posts.map((p) => (
+        <Card
+          href={`/blog/${p.id}/`}
+          title={p.data.title}
+          description={p.data.description}
+          date={p.data.pubDate}
+          tags={p.data.tags}
+          kicker="log"
+        />
+      ))
+    }
+  </div>
+</BaseLayout>
